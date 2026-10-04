@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Süper Robot — iPhone</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;color:#fff;background:linear-gradient(135deg,#3030a0,#8b28b5);min-height:100vh}
+.app{padding:max(12px,env(safe-area-inset-top)) 12px 12px;max-width:900px;margin:auto}
+header{display:flex;align-items:center;gap:10px;padding:8px 4px 12px}
+header .spark{font-size:26px;color:#ffe600}
+input{flex:1;background:transparent;border:0;color:#fff;font-size:23px;font-weight:700;outline:0}
+input::placeholder{color:#ddd}
+button{border:0;cursor:pointer}
+.trash{width:42px;height:42px;border-radius:50%;background:#e33;color:#fff;font-size:20px}
+.canvas{height:45vh;min-height:320px;max-height:520px;border:2px solid #ffffff55;border-radius:24px;background:#0004;position:relative;overflow:hidden}
+.hint{position:absolute;inset:0;display:grid;place-content:center;text-align:center;color:#fff9;font-size:17px;pointer-events:none}
+.part{position:absolute;width:90px;height:90px;display:grid;place-items:center;font-size:65px;user-select:none;touch-action:none;transform-origin:center;z-index:2}
+.part.selected{outline:3px solid #ffe600;border-radius:50%;outline-offset:7px}
+.colors{display:flex;gap:12px;overflow-x:auto;padding:10px 4px}
+.colors.hidden{display:none}
+.swatch{width:36px;height:36px;border-radius:50%;border:2px solid white;flex:0 0 auto}
+.panel{background:#0005;border-radius:18px;margin-top:12px;padding:12px 0}
+.tabs{display:flex;padding:0 8px;gap:4px}
+.tab{flex:1;padding:10px 4px;border-radius:10px;background:#ffffff22;color:#fff;font-weight:700}
+.tab.active{background:#fff;color:#46206e}
+.parts{display:flex;gap:12px;overflow-x:auto;padding:12px 8px 4px}
+.card{min-width:105px;padding:12px 8px;border-radius:16px;background:#ffffff22;color:#fff;text-align:center}
+.card .icon{font-size:38px;height:45px}
+.card small{font-weight:700}
+.run{width:calc(100% - 24px);margin:12px;background:#ffe000;padding:15px;border-radius:20px;font-size:18px;font-weight:800;color:#111;box-shadow:0 5px 20px #ffe00055}
+.dance{animation:dance .1s infinite alternate}
+@keyframes dance{from{transform:translate(-7px,-5px) rotate(-3deg)}to{transform:translate(7px,5px) rotate(3deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="spark">✦</div>
+  <input id="name" value="Süper Robot" placeholder="Robotunun Adı">
+  <button class="trash" id="clear">🗑</button>
+</header>
+
+<div class="canvas" id="canvas">
+  <div class="hint" id="hint">👆<br>Aşağıdan bir parça seçerek başla!</div>
+</div>
+
+<div class="colors hidden" id="colors"></div>
+
+<div class="panel">
+  <div class="tabs">
+    <button class="tab active" data-cat="head">Baş</button>
+    <button class="tab" data-cat="body">Gövde</button>
+    <button class="tab" data-cat="accessory">Aksesuar</button>
+  </div>
+  <div class="parts" id="parts"></div>
+</div>
+
+<button class="run" id="run">⚡ ROBOTU ÇALIŞTIR!</button>
+</div>
+
+<script>
+const parts=[
+ {name:"TV Baş",cat:"head",icon:"📺",color:"#00e5ff"},
+ {name:"Antenli Baş",cat:"head",icon:"🤖",color:"#ff9800"},
+ {name:"Kare Baş",cat:"head",icon:"⬛",color:"#b04cff"},
+ {name:"Klasik Gövde",cat:"body",icon:"⚙️",color:"#287cff"},
+ {name:"Süper Gövde",cat:"body",icon:"🛡️",color:"#ff3b30"},
+ {name:"Düğmeli Gövde",cat:"body",icon:"🔘",color:"#34c759"},
+ {name:"Gözlük",cat:"accessory",icon:"🥽",color:"#ffd60a"},
+ {name:"Taç",cat:"accessory",icon:"👑",color:"#ffd60a"},
+ {name:"Roket",cat:"accessory",icon:"⚡",color:"#ff9500"}
+];
+const colors=["#00e5ff","#ff9500","#af52de","#287cff","#ff3b30","#34c759","#ffd60a","#ff2d55","#8e8e93"];
+let selectedCat="head", selected=null, items=[], dragging=null, offset={x:0,y:0};
+
+const canvas=document.getElementById("canvas"), hint=document.getElementById("hint");
+const colorsEl=document.getElementById("colors"), list=document.getElementById("parts");
+
+function beep(){try{navigator.vibrate?.(25)}catch(e){}}
+function renderParts(){
+ list.innerHTML="";
+ parts.filter(p=>p.cat===selectedCat).forEach(p=>{
+   const d=document.createElement("button"); d.className="card";
+   d.innerHTML=`<div class="icon">${p.icon}</div><small>${p.name}</small>`;
+   d.onclick=()=>addPart(p); list.appendChild(d);
+ });
+}
+function selectItem(el,item){
+ selected=item; document.querySelectorAll(".part").forEach(x=>x.classList.remove("selected"));
+ el.classList.add("selected"); colorsEl.classList.remove("hidden");
+ colorsEl.innerHTML="";
+ colors.forEach(c=>{
+   const s=document.createElement("button");s.className="swatch";s.style.background=c;
+   s.onclick=()=>{item.color=c;el.style.color=c;beep()}; colorsEl.appendChild(s);
+ });
+}
+function addPart(p){
+ const item={...p,x:canvas.clientWidth/2-45,y:canvas.clientHeight/2-45,color:p.color};
+ items.push(item); hint.style.display="none";
+ const el=document.createElement("div");el.className="part";el.textContent=p.icon;el.style.color=p.color;
+ el.style.left=item.x+"px";el.style.top=item.y+"px";
+ el.onpointerdown=e=>{
+   e.preventDefault(); selectItem(el,item); dragging={el,item};
+   const r=canvas.getBoundingClientRect(); offset.x=e.clientX-r.left-item.x; offset.y=e.clientY-r.top-item.y;
+   el.setPointerCapture(e.pointerId);
+ };
+ el.onpointermove=e=>{
+   if(!dragging||dragging.el!==el)return;
+   const r=canvas.getBoundingClientRect();
+   item.x=Math.max(0,Math.min(canvas.clientWidth-90,e.clientX-r.left-offset.x));
+   item.y=Math.max(0,Math.min(canvas.clientHeight-90,e.clientY-r.top-offset.y));
+   el.style.left=item.x+"px";el.style.top=item.y+"px";
+ };
+ el.onpointerup=()=>{dragging=null};
+ canvas.appendChild(el); selectItem(el,item); beep();
+}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");
+ selectedCat=b.dataset.cat;renderParts();
+});
+document.getElementById("clear").onclick=()=>{
+ items=[];canvas.querySelectorAll(".part").forEach(x=>x.remove());hint.style.display="grid";selected=null;colorsEl.classList.add("hidden");beep();
+};
+document.getElementById("run").onclick=()=>{
+ document.querySelectorAll(".part").forEach(x=>x.classList.add("dance"));
+ beep(); setTimeout(()=>document.querySelectorAll(".part").forEach(x=>x.classList.remove("dance")),1600);
+};
+renderParts();
+</script>
+</body>
+</html>
